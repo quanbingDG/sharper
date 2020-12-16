@@ -62,8 +62,25 @@ class PandasSupport:
             re_[i] = pd.api.types.infer_dtype(df_[i], skipna=True)
         return re_[col] if col else re_
 
+    @staticmethod
+    def add_sum(df_: pd.DataFrame, axis=0):
+        '''
+        :param df_: pandas dataframe
+        :param axis: default 0, support 1
+        :return:  new dataframe with sum
+        '''
+        sum_list = []
+        for i in df_.columns:
+            try: sum_list.append(sum(df_[i]))
+            except: sum_list.append(np.nan)
+        df_.loc['sum'] = sum_list
+        return df_
+
 
 if __name__ == '__main__':
     PS = PandasSupport()
     a = pd.DataFrame(np.array([1, 2, 3, 4]).reshape(2, 2), columns=['i1', 'i2'])
-    print(PS.type_infer(a, 'i1'))
+    b = a.pipe(PS.add_ratio, cols=['i1', 'i2'], csum=True)
+    print(b.pipe(PS.add_sum, axis=0))
+    print(b.pipe(PS.type_infer))
+    print(PS.type_infer(a))
