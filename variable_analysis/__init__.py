@@ -3,3 +3,5 @@
 # @Author : quanbing
 # @Email : quanbinks@sina.com
 # @File : __init__.py.py
+
+from .variable_analysis import VariableAnalysis
