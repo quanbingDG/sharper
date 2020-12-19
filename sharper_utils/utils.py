@@ -7,6 +7,7 @@
 from pandas import Series
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 from sklearn.metrics import normalized_mutual_info_score
 
 
@@ -89,3 +90,35 @@ class Utils:
     @staticmethod
     def auc(x, y, d_type):
         pass
+
+    @staticmethod
+    def diff_dict(a:dict, b: dict, re_type='key'):
+        """
+        :param a: dict a
+        :param b: dict b
+        :param re_type: {key: "default key:return diff key list", all: "return diff element"}
+        :return: list
+        """
+        if re_type == 'all':
+            return set(a.items()) ^ set(b.items())
+        return [i for i in a.keys() if a.get(i, None) != b.get(i, None)]
+
+    @staticmethod
+    def minus_list(a: list, b: list) -> list:
+        return [i for i in a if i not in b]
+
+    @staticmethod
+    def combin_list(a: list, include: list =[], exclude: list =[]):
+        re = set(a) if include.__len__() == 0 else set(include)
+        re = list(re - set(exclude))
+        return re
+
+    @staticmethod
+    def mutual_info_matrix(df_: pd.DataFrame):
+        re = pd.DataFrame(index=df_.columns)
+
+        for i in df_.columns:
+            re[i] = [normalized_mutual_info_score(df_[i], df_[j]) for j in df_.columns]
+
+        return re
+
