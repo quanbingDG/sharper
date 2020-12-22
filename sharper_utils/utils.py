@@ -122,3 +122,18 @@ class Utils:
 
         return re
 
+    @staticmethod
+    def normalization(series: pd.Series):
+        _max = series.max()
+        _min = series.min()
+        return pd.Series([(i-_min) / (_max - _min) for i in series])
+
+    @staticmethod
+    def np_count(series, value, default=None):
+        count = (series == value).sum()
+
+        if default is not None and count == 0:
+            return default
+
+        return count
+

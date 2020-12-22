@@ -7,17 +7,34 @@
 import sys
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import ipywidgets as wg
 from copy import deepcopy
 from IPython.display import display
 from ipywidgets import Layout
+from ..metrics import Metrics
 from ..sharper_utils import Utils as ut
 from ..sharper_utils import PlotUtils as put
 
 
 class VariableAnalysis:
+    """
+        单变量分析工具，实现功能如下：
+            指标值统计量[缺失率、方差、极值、变量稳定性]
+            指标与Y标签的相关性
+            单指标AUC/KS计算
+            IV值计算
+            AR值计算
+            单指标逻辑回归输出参数与P值
+    """
     def __init__(self, data: pd.DataFrame, target: str) -> None:
+        """
+            Parameters
+            ----------
+            data : analyis data
+            target: y
+
+        """
+
         self._ori_data = data
         self._target = target
         self._data = data.copy()
@@ -34,38 +51,11 @@ class VariableAnalysis:
         self._include = None
         self._exclude = None
         self._cols = data.columns
-
-    @property
-    def distribute(self):
-        if self._distribute is None:
-            return self.plot_distribute()
-        return self._distribute
-
-    @property
-    def corr_matrix(self):
-        if self._corr_matrix is None:
-            return self._gen_corr_matrix()
-        return self._corr_matrix
-
-    @property
-    def infer_norminal(self):
-        return self._infer_norminal_by_nunique
-
-    @infer_norminal.setter
-    def infer_norminal(self, value: bool):
-        self._infer_norminal_by_nunique = value
-
-    @property
-    def distribute_with_target(self):
-        if self._distribute_with_target is None:
-            return self.plot_distribute_with_target()
-        return self._distribute_with_target
-
-    @property
-    def stable(self):
-        if self._stable is None:
-            return self.plot_stable()
-        return self._stable
+        self._ks = None
+        self._auc = None
+        self._ar = None
+        self._iv = None
+        self._lr_param = None
 
     @property
     def ori_data(self):
@@ -106,8 +96,89 @@ class VariableAnalysis:
         self._update_cols()
 
     @property
+    def distribute(self):
+        """
+        :return: Distribution of variables
+        :sample: {'var_1': subplots, ... , 'var_n': subplots}
+        """
+        if self._distribute is None:
+            return self.plot_distribute()
+        return self._distribute
+
+    @property
+    def corr_matrix(self):
+        """
+        :return: Variable correlation matrix
+        :sample {'pearson': dataframe, 'kendall': dataframe, 'spearman': dataframe , 'mutual_info': dataframe}
+
+        """
+        if self._corr_matrix is None:
+            return self._gen_corr_matrix()
+        return self._corr_matrix
+
+    @property
+    def infer_norminal(self):
+        """
+        :return: Whether to infer the data type from nunique, bool
+        """
+        return self._infer_norminal_by_nunique
+
+    @infer_norminal.setter
+    def infer_norminal(self, value: bool):
+        """
+        :param value: Whether to infer the data type from nunique, bool
+        :return: None
+        """
+        self._infer_norminal_by_nunique = value
+
+    @property
+    def distribute_with_target(self):
+        """
+        :return: Distribution 2d with (var, y)
+        """
+        if self._distribute_with_target is None:
+            return self.plot_distribute_with_target()
+        return self._distribute_with_target
+
+    @property
+    def stable(self):
+        if self._stable is None:
+            return self.plot_stable()
+        return self._stable
+
+    @property
     def cols(self):
         return self._cols
+
+    @property
+    def univariat_ks(self):
+        if self._ks is None:
+            return self._gen_ks()
+        return self._ks
+
+    @property
+    def univariat_auc(self):
+        if self._auc is None:
+            return self._gen_auc()
+        return self._auc
+
+    @property
+    def univariat_ar(self):
+        if self._ar is None:
+            return self._gen_ar()
+        return self._ar
+
+    @property
+    def univariat_iv(self):
+        if self._iv is None:
+            return self._gen_iv()
+        return self._iv
+
+    @property
+    def univariat_lr(self):
+        if self._lr_param is None:
+            self._gen_lr_param()
+        return self._lr_param
 
     def _update_cols(self):
         _include = self._include if self._include else []
@@ -290,5 +361,58 @@ class VariableAnalysis:
         return self._corr_matrix
 
     def _gen_ks(self):
-        pass
+        re = {}
+        for col in self._cols:
+            if ut.is_numeric(self._data[col]) and col != self._target:
+                re[col] = Metrics.ks(self._y, ut.normalization(self._X[col]))
+        self._ks = pd.DataFrame.from_dict(re, orient='index', columns=['ks'])
+        return self._ks
 
+    def _gen_auc(self):
+        re = {}
+        for col in self._cols:
+            if ut.is_numeric(self._data[col]) and col != self._target:
+                re[col] = Metrics.auc(self._y, ut.normalization(self._X[col]))
+        self._auc = pd.DataFrame.from_dict(re, orient='index', columns=['auc'])
+        return self._auc
+
+    def _gen_ar(self):
+        re = {}
+        for col in self._cols:
+            if ut.is_numeric(self._data[col]) and col != self._target:
+                re[col] = Metrics.ar(self._y, ut.normalization(self._X[col]))
+        self._ar = pd.DataFrame.from_dict(re, orient='index', columns=['ar'])
+        return self._ar
+
+    def _gen_iv(self):
+        from toad import quality
+        self._iv = quality(self._data, self._target, iv_only=True)[['iv']]
+        return self._iv
+
+    def _gen_lr_param(self):
+        from scipy import stats
+        from sklearn.linear_model import LogisticRegressionCV
+
+        cols = self._cols.drop(self._target)
+        re = {}
+        lr_cv = LogisticRegressionCV(random_state=9527, max_iter=10000)
+        for col in cols:
+
+            X = np.array(self._X[col]).reshape(-1,1)
+            y = self._y
+            lr_cv.fit(X, y)
+            params = np.append(lr_cv.intercept_, lr_cv.coef_)
+            pred = lr_cv.predict(X)
+            newX = pd.DataFrame({"Constant": np.ones(len(X))}).join(pd.DataFrame(X))
+            MSE = (sum((y - pred) ** 2)) / (len(newX) - len(newX.columns))
+
+            var_b = MSE * (np.linalg.inv(np.dot(newX.T, newX)).diagonal())
+            sd_b = np.round(np.sqrt(var_b), 4)
+            ts_b = np.round(params / sd_b, 4)
+
+            p_values = np.round([2 * (1 - stats.t.cdf(np.abs(i), (len(newX) - 1))) for i in ts_b], 4)
+            re[col] = {'coef_':lr_cv.coef_[0][0], 'intercept':lr_cv.intercept_[0], 'p_value':p_values}
+
+        self._lr_param = pd.DataFrame.from_dict(re, orient='index')
+
+        return self._lr_param
