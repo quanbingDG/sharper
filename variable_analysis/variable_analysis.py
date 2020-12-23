@@ -43,7 +43,6 @@ class VariableAnalysis:
         self._X = data.drop(target, axis=1).copy()
         self._y = data[target].copy()
         self._infer_dict = data.dtypes.to_dict()
-        self._infer_norminal_by_nunique = False
         self._desc = None
         self._desc_slice = None
         self._distribute = None
@@ -147,21 +146,6 @@ class VariableAnalysis:
         return self._corr_matrix
 
     @property
-    def infer_norminal(self):
-        """
-        :return: Whether to infer the data type from nunique, bool
-        """
-        return self._infer_norminal_by_nunique
-
-    @infer_norminal.setter
-    def infer_norminal(self, value: bool):
-        """
-        :param value: Whether to infer the data type from nunique, bool
-        :return: None
-        """
-        self._infer_norminal_by_nunique = value
-
-    @property
     def distribute_with_target(self):
         """
         :return: Distribution 2d with (var, y)
@@ -227,11 +211,11 @@ class VariableAnalysis:
             raise TypeError("please input the value like {'col1': int, 'col2': float}")
 
     @property
-    def infer_data_type(self, threshold=6):
+    def infer_data_type(self, infer_flag=False, threshold=6):
         modify_cols = {}
         infer_dtype = deepcopy(self._infer_dict)
 
-        if self._infer_norminal_by_nunique:
+        if infer_flag:
             for col in self._data.columns:
                 if self._data[col].nunique() < threshold:
                     modify_cols[col] = np.dtype('O')
@@ -276,7 +260,7 @@ class VariableAnalysis:
         self._data_type = columns
         return self._infer_dict
 
-    def gen_desc(self, na: list = [np.nan], percentiles=[.01, .1, .5, .75, .9, .99]):
+    def gen_desc(self, na: list = [], percentiles=[.01, .1, .5, .75, .9, .99]):
         rows = []
 
         for name, series in self._data[self._cols].items():
