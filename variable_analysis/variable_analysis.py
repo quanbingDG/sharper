@@ -51,7 +51,7 @@ class VariableAnalysis:
         self._corr_matrix = None
         self._include = None
         self._exclude = None
-        self._cols = data.columns
+        self._cols = data.columns.drop(target)
         self._ks = None
         self._auc = None
         self._ar = None
@@ -148,6 +148,10 @@ class VariableAnalysis:
     @property
     def distribute_with_target(self):
         """
+        Calculate correlation matrix based on X and y
+
+        Parameters
+        ----------
         :return: Distribution 2d with (var, y)
         """
         if self._distribute_with_target is None:
@@ -156,51 +160,80 @@ class VariableAnalysis:
 
     @property
     def stable(self):
+        """
+        generate the plots which stability of variables
+        :return: {'var':subplot}
+        """
         if self._stable is None:
             return self.plot_stable()
         return self._stable
 
     @property
     def cols(self):
+        """
+        Set of columns to be processed
+        :return: array like
+        """
         return self._cols
 
     @property
     def univariat_ks(self):
+        """
+        :return: Univariate ks value collection
+        """
         if self._ks is None:
             return self._gen_ks()
         return self._ks
 
     @property
     def univariat_auc(self):
+        """
+        :return: Univariate auc value collection
+        """
         if self._auc is None:
             return self._gen_auc()
         return self._auc
 
     @property
     def univariat_ar(self):
+        """
+        :return: Univariate ar value collection
+        """
         if self._ar is None:
             return self._gen_ar()
         return self._ar
 
     @property
     def univariat_iv(self):
+        """
+        :return: Univariate iv value collection, user sklearn dt merge in order to achieve the max iv
+        """
         if self._iv is None:
             return self._gen_iv()
         return self._iv
 
     @property
     def univariat_lr(self):
+        """
+        :return: Univariate lr parame and p_value collection
+        """
         if self._lr_param is None:
             self._gen_lr_param()
         return self._lr_param
 
     def _update_cols(self):
+        """
+        modify property cols
+        """
         _include = self._include if self._include else []
         _exclude = self._exclude if self._exclude else []
         self._cols = ut.combin_list(self._data.columns, _include, _exclude)
 
     @property
     def _data_type(self):
+        """
+        :return: Type of data
+        """
         return self._infer_dict
 
     @_data_type.setter
@@ -212,6 +245,15 @@ class VariableAnalysis:
 
     @property
     def infer_data_type(self, infer_flag=False, threshold=6):
+        """
+        Infer the data type according to the data range
+
+        Parameters
+        ----------
+        :param infer_flag: Whether to speculate based on the variable unique, default False
+        :param threshold: When infer_flag is True, it's will determine the threshold
+        :return: infer data type
+        """
         modify_cols = {}
         infer_dtype = deepcopy(self._infer_dict)
 
@@ -238,6 +280,9 @@ class VariableAnalysis:
 
     @property
     def modify_dtype(self):
+        """
+        Convert primitive data type according to infer dict
+        """
         self._data = self._data.astype(self._infer_dict)
         self._X = self._data.drop(self._target, axis=1).copy()
         self._y = self._data[self._target].copy()
@@ -246,21 +291,44 @@ class VariableAnalysis:
 
     @property
     def desc(self):
+        """
+        :return: Variable description
+        """
         if self._desc is None:
             return self.gen_desc()
         return self._desc
 
     @property
     def desc_slice(self):
+        """
+        :return: Variable description base on slice
+        """
         if self._desc_slice is None:
             return "please call the method slice_desc() first !"
         return self._desc_slice
 
-    def update_infer_type(self, columns: dict):
-        self._data_type = columns
+    def update_infer_type(self, mapping: dict):
+        """
+        Manually modify the variable type
+
+        Parameters
+        ----------
+        :param mapping: {'var_1': type_1,.., 'var_n': type_n}
+        :return: Modified infer_dict
+        """
+        self._data_type = mapping
         return self._infer_dict
 
     def gen_desc(self, na: list = [], percentiles=[.01, .1, .5, .75, .9, .99]):
+        """
+        Generate variable statistical description
+
+        Parameters
+        ----------
+        :param na: Set of values not to be counted, default = []
+        :param percentiles: Percentile points to be counted, default = [.01, .1, .5, .75, .9, .99]
+        :return:
+        """
         rows = []
 
         for name, series in self._data[self._cols].items():
@@ -299,6 +367,14 @@ class VariableAnalysis:
         return self._desc
 
     def plot_distribute(self, save_path=None):
+        """
+        Draw distribution plot based on variable data
+
+        Parameters
+        ----------
+        :param save_path: Path to save fig, if None ignore save
+        :return:
+        """
         re = {}
 
         for col in self._cols:
@@ -315,6 +391,14 @@ class VariableAnalysis:
         return self._distribute
 
     def plot_distribute_with_target(self, save_path=None):
+        """
+        Draw distribution plot based on X and y
+
+        Parameters
+        ----------
+        :param save_path: Path to save fig, if None ignore save
+        :return:
+        """
         re = {}
 
         for col in self._cols:
@@ -331,6 +415,14 @@ class VariableAnalysis:
         return self._distribute_with_target
 
     def slice_desc(self, by):
+        """
+        Variable description base on slice
+
+        Parameters
+        ----------
+        :param by: date columns
+        :return:
+        """
         re = {}
 
         if self._data[by].dtype.kind != 'M':
@@ -352,6 +444,9 @@ class VariableAnalysis:
         return self._desc_slice
 
     def plot_stable(self):
+        """
+        generate the plots which stability of variables
+        """
         if self._desc_slice is None:
             return "please call the method slice_desc() first !"
 
@@ -367,14 +462,20 @@ class VariableAnalysis:
         return self._stable
 
     def _gen_corr_matrix(self):
-        self._corr_matrix = {'pearson': self._ori_data[self._cols].corr(method='pearson'),
-                             'kendall': self._ori_data[self._cols].corr(method='kendall'),
-                             'spearman': self._ori_data[self._cols].corr(method='spearman'),
-                             'mutual_info': ut.mutual_info_matrix(self._ori_data[self._cols])}
+        """
+        generate the corr matrix
+        """
+        self._corr_matrix = {'pearson': self._ori_data.corr(method='pearson'),
+                             'kendall': self._ori_data.corr(method='kendall'),
+                             'spearman': self._ori_data.corr(method='spearman'),
+                             'mutual_info': ut.mutual_info_matrix(self._ori_data)}
 
         return self._corr_matrix
 
     def _gen_ks(self):
+        """
+        Single variable ks value calculation
+        """
         re = {}
         for col in self._cols:
             if ut.is_numeric(self._data[col]) and col != self._target:
@@ -383,6 +484,9 @@ class VariableAnalysis:
         return self._ks
 
     def _gen_auc(self):
+        """
+        Single variable auc value calculation
+        """
         re = {}
         for col in self._cols:
             if ut.is_numeric(self._data[col]) and col != self._target:
@@ -391,6 +495,9 @@ class VariableAnalysis:
         return self._auc
 
     def _gen_ar(self):
+        """
+        Single variable ar value calculation
+        """
         re = {}
         for col in self._cols:
             if ut.is_numeric(self._data[col]) and col != self._target:
@@ -399,18 +506,23 @@ class VariableAnalysis:
         return self._ar
 
     def _gen_iv(self):
+        """
+        Single variable iv value calculation
+        """
         from toad import quality
         self._iv = quality(self._data, self._target, iv_only=True)[['iv']]
         return self._iv
 
     def _gen_lr_param(self):
+        """
+        Single variable lr param and p_value calculation
+        """
         from scipy import stats
         from sklearn.linear_model import LogisticRegressionCV
 
-        cols = self._cols.drop(self._target)
         re = {}
         lr_cv = LogisticRegressionCV(random_state=9527, max_iter=10000)
-        for col in cols:
+        for col in self._cols:
 
             X = np.array(self._X[col]).reshape(-1,1)
             y = self._y
