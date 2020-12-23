@@ -18,20 +18,22 @@ from ..sharper_utils import PlotUtils as put
 
 class VariableAnalysis:
     """
-        单变量分析工具，实现功能如下：
-            指标值统计量[缺失率、方差、极值、变量稳定性]
-            指标与Y标签的相关性
-            单指标AUC/KS计算
-            IV值计算
-            AR值计算
-            单指标逻辑回归输出参数与P值
+        Univariate analysis tool with the following functions：
+            1. Indicator value statistics [missing rate, variance, extreme value, variable stability]
+            2. Correlation between the indicator and Y label
+            3. Single indicator AUC/KS calculation
+            4. IV value calculation
+            5. AR value calculation
+            6. Single index logistic regression parameters and P value output
     """
     def __init__(self, data: pd.DataFrame, target: str) -> None:
         """
+            VariableAnalysis init method
+
             Parameters
             ----------
-            data : analyis data
-            target: y
+            data : analyis data include target
+            target: target columns
 
         """
 
@@ -59,22 +61,38 @@ class VariableAnalysis:
 
     @property
     def ori_data(self):
+        """
+        :return: Dataframe, Incoming raw data
+        """
         return self._ori_data
 
     @property
     def data(self):
+        """
+        :return: Dataframe, Target data processed
+        """
         return self._data
 
     @property
     def X(self):
+        """
+        :return: Dataframe, Set of variables
+        """
         return self._X
 
     @property
     def y(self):
+        """
+        :return: Series, Set of y variable
+        """
         return self._y
 
     @property
     def include(self):
+        """
+        Set which columns need to be processed, default all
+        :return: array like
+        """
         return self._include
 
     @include.setter
@@ -86,6 +104,10 @@ class VariableAnalysis:
 
     @property
     def exclude(self):
+        """
+        Set the columns that do not need to be processed, default None
+        :return: array like
+        """
         return self._exclude
 
     @exclude.setter
@@ -98,7 +120,11 @@ class VariableAnalysis:
     @property
     def distribute(self):
         """
-        :return: Distribution of variables
+        Draw distribution plot based on variable data
+
+        Parameters
+        ----------
+        :return: {Distribution of variables}
         :sample: {'var_1': subplots, ... , 'var_n': subplots}
         """
         if self._distribute is None:
@@ -108,6 +134,10 @@ class VariableAnalysis:
     @property
     def corr_matrix(self):
         """
+        Calculate correlation matrix based on variables
+
+        Parameters
+        ----------
         :return: Variable correlation matrix
         :sample {'pearson': dataframe, 'kendall': dataframe, 'spearman': dataframe , 'mutual_info': dataframe}
 
