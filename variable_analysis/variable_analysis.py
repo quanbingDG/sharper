@@ -40,8 +40,6 @@ class VariableAnalysis:
         self._ori_data = data
         self._target = target
         self._data = data.copy()
-        self._X = data.drop(target, axis=1).copy()
-        self._y = data[target].copy()
         self._infer_dict = data.dtypes.to_dict()
         self._desc = None
         self._desc_slice = None
@@ -73,20 +71,6 @@ class VariableAnalysis:
         return self._data
 
     @property
-    def X(self):
-        """
-        :return: Dataframe, Set of variables
-        """
-        return self._X
-
-    @property
-    def y(self):
-        """
-        :return: Series, Set of y variable
-        """
-        return self._y
-
-    @property
     def include(self):
         """
         Set which columns need to be processed, default all
@@ -115,6 +99,14 @@ class VariableAnalysis:
             raise TypeError("please give me list type")
         self._exclude = value
         self._update_cols()
+
+    @property
+    def X(self):
+        return self._data[self._cols].copy()
+
+    @property
+    def y(self):
+        return self._data[self._target].copy()
 
     @property
     def distribute(self):
@@ -244,14 +236,13 @@ class VariableAnalysis:
             raise TypeError("please input the value like {'col1': int, 'col2': float}")
 
     @property
-    def infer_data_type(self, infer_flag=False, threshold=6):
+    def data_type_infer(self, infer_flag=True):
         """
         Infer the data type according to the data range
 
         Parameters
         ----------
         :param infer_flag: Whether to speculate based on the variable unique, default False
-        :param threshold: When infer_flag is True, it's will determine the threshold
         :return: infer data type
         """
         modify_cols = {}
@@ -259,8 +250,7 @@ class VariableAnalysis:
 
         if infer_flag:
             for col in self._data.columns:
-                if self._data[col].nunique() < threshold:
-                    modify_cols[col] = np.dtype('O')
+                modify_cols[col] = ut.data_type_classifier(self._data[col])
             infer_dtype.update(modify_cols)
 
         display(wg.Text(
@@ -278,16 +268,35 @@ class VariableAnalysis:
             self._data_type = modify_cols
             return self._infer_dict
 
-    @property
-    def modify_dtype(self):
+    def data_type_update(self, mapping: dict):
         """
-        Convert primitive data type according to infer dict
-        """
-        self._data = self._data.astype(self._infer_dict)
-        self._X = self._data.drop(self._target, axis=1).copy()
-        self._y = self._data[self._target].copy()
+        Manually modify the variable type
 
-        return "modify succeed"
+        Parameters
+        ----------
+        :param mapping: {'var_1': type_1,.., 'var_n': type_n}
+        :return: Modified infer_dict
+        """
+        if ut.is_legal_type(mapping.values()):
+            self._data_type = mapping
+            return "Modify successfully, {0}".format(self._data_type)
+        else:
+            raise ValueError("Only the following types are supported, {0}".format(ut.LEGAL_TYPE))
+
+    def __modify_data(self, data: pd.DataFrame):
+        self._data = data
+
+    @property
+    def data_type_convert(self):
+        """
+        Convert primitive data type according to set data type
+        """
+        data = self._data.copy()
+        for col, types in self._data_type.items():
+            data[col] = ut.convert_type(data[col], types)
+        self.__modify_data(data)
+
+        return "Modify successfully"
 
     @property
     def desc(self):
@@ -307,19 +316,7 @@ class VariableAnalysis:
             return "please call the method slice_desc() first !"
         return self._desc_slice
 
-    def update_infer_type(self, mapping: dict):
-        """
-        Manually modify the variable type
-
-        Parameters
-        ----------
-        :param mapping: {'var_1': type_1,.., 'var_n': type_n}
-        :return: Modified infer_dict
-        """
-        self._data_type = mapping
-        return self._infer_dict
-
-    def gen_desc(self, na: list = [], percentiles=[.01, .1, .5, .75, .9, .99]):
+    def gen_desc(self, ignore: list = [], percentiles=[.01, .1, .5, .75, .9, .99]):
         """
         Generate variable statistical description
 
@@ -331,8 +328,8 @@ class VariableAnalysis:
         """
         rows = []
 
-        for name, series in self._data[self._cols].items():
-            series = series[-series.isin(na)]
+        for name, series in self.X.items():
+            series = series[-series.isin(ignore)]
             numeric_index = ['mean', 'std', 'min', '1%', '10%', '50%', '75%', '90%', '99%', 'max']
             discrete_index = ['top1', 'top2', 'top3', 'top4', 'top5', 'bottom5', 'bottom4', 'bottom3', 'bottom2',
                               'bottom1']
@@ -378,10 +375,10 @@ class VariableAnalysis:
         re = {}
 
         for col in self._cols:
-            try:
-                re[col] = put.plot_distribute_hist(self._data[col], title=col)
-            except:
-                print("the {0} columns plot failed".format(col))
+            # try:
+            re[col] = put.plot_distribute(self.X, col=col, dtypes=self._infer_dict[col])
+            # except:
+            #     print("the {0} columns plot failed".format(col))
 
         if save_path:
             [put.save_fig(re[i], i, 'distribute') for i in re.keys()]
@@ -479,7 +476,7 @@ class VariableAnalysis:
         re = {}
         for col in self._cols:
             if ut.is_numeric(self._data[col]) and col != self._target:
-                re[col] = Metrics.ks(self._y, ut.normalization(self._X[col]))
+                re[col] = Metrics.ks(self._data[self._target], ut.normalization(self._data[col]))
         self._ks = pd.DataFrame.from_dict(re, orient='index', columns=['ks'])
         return self._ks
 
@@ -490,7 +487,7 @@ class VariableAnalysis:
         re = {}
         for col in self._cols:
             if ut.is_numeric(self._data[col]) and col != self._target:
-                re[col] = Metrics.auc(self._y, ut.normalization(self._X[col]))
+                re[col] = Metrics.auc(self._data[self._target], ut.normalization(self._data[col]))
         self._auc = pd.DataFrame.from_dict(re, orient='index', columns=['auc'])
         return self._auc
 
@@ -501,7 +498,7 @@ class VariableAnalysis:
         re = {}
         for col in self._cols:
             if ut.is_numeric(self._data[col]) and col != self._target:
-                re[col] = Metrics.ar(self._y, ut.normalization(self._X[col]))
+                re[col] = Metrics.ar(self._data[self._target], ut.normalization(self._data[col]))
         self._ar = pd.DataFrame.from_dict(re, orient='index', columns=['ar'])
         return self._ar
 
@@ -524,8 +521,8 @@ class VariableAnalysis:
         lr_cv = LogisticRegressionCV(random_state=9527, max_iter=10000)
         for col in self._cols:
 
-            X = np.array(self._X[col]).reshape(-1,1)
-            y = self._y
+            X = np.array(self.X[col]).reshape(-1,1)
+            y = self.y
             lr_cv.fit(X, y)
             params = np.append(lr_cv.intercept_, lr_cv.coef_)
             pred = lr_cv.predict(X)
@@ -542,3 +539,4 @@ class VariableAnalysis:
         self._lr_param = pd.DataFrame.from_dict(re, orient='index')
 
         return self._lr_param
+

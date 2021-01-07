@@ -13,32 +13,38 @@ import matplotlib.pyplot as plt
 
 class PlotUtils:
     @staticmethod
-    def plot_distribute_hist(x: pd.Series, title: str=None, nbin=10, fig_size=(9, 6)):
-        '''
-        :param x: pandas series
-        :param title: plot name
-        :param nbin: num of bins
-        :param fig_size:
-        :return: matplot figure
-        '''
-        fig = plt.figure(figsize=fig_size)
-        weights = np.ones_like(x) / float(len(x))
-        fig = x.hist(color=sns.desaturate("indianred", .8), bins=nbin, weights=weights).get_figure()
-        plt.title(title if title else x.name)
+    def plot_distribute(data: pd.DataFrame, col, dtypes, **kwargs):
+        if dtypes in ['Categorical', 'Ordinal']:
+            return PlotUtils.plot_distribute_bar(data, col, **kwargs)
+        elif dtypes == 'Continues':
+            return PlotUtils.plot_distribute_hist(data, col, **kwargs)
+        return None
+
+    @staticmethod
+    def plot_distribute_hist(data: pd.DataFrame, x: str, stat='count', **kwargs):
+        """
+        :param data: data
+        :param x: x
+        :param stat: {“count”, “frequency”, “density”, “probability”}
+        :param kwargs:
+        :return:
+        """
+        # weights = np.ones_like(series) / float(len(series))
+        fig = sns.histplot(data=data, x=x, stat=stat, **kwargs)
+        plt.title(kwargs.get('title') if kwargs.get('title') else x)
         plt.close('all')
         return fig
 
     @staticmethod
-    def plot_distribute_bar(x: pd.Series, title: str, nbin=10, figsize=(9, 6)):
+    def plot_distribute_bar(data: pd.DataFrame, x: str, **kwargs):
         '''
-        :param x: pandas series
+        :param data: pandas series
         :param title: plot name
         :param nbin: num of bins
         :return: matplot figure
         '''
-        fig = plt.figure(figsize=figsize)
-        fig = x.plot(kind='bar', color=sns.desaturate("indianred", .8), bins=nbin).get_figure()
-        plt.title(title)
+        fig = sns.countplot(data=data, x=x, **kwargs)
+        plt.title(kwargs.get('title') if kwargs.get('title') else x)
         plt.close('all')
         return fig
 

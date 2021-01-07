@@ -12,13 +12,52 @@ from sklearn.metrics import normalized_mutual_info_score
 
 
 class Utils:
+
+    LEGAL_TYPE = ['Categorical', 'Continues', 'Ordinal', 'Datetime', 'Other']
+
     @staticmethod
     def is_numeric(series):
         """
+        Determine whether it is numeric
         :param series: pandas.series
         :return: boolean
         """
-        return series.dtype.kind in 'ifc'
+        return series.dtype.kind in 'iufc'
+
+    @staticmethod
+    def is_ordinal(series: Series):
+        """
+        Determine whether it is ordinal
+        :param series:
+        :return:
+        """
+        if pd.Series(sorted(series.dropna().unique())).diff().dropna().nunique() == 1:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def is_categorical(series: Series):
+        return series.dtype.kind in 'OUSb'
+
+    @staticmethod
+    def is_datetime(series: Series):
+        return series.dtype.kind == 'M'
+
+    @staticmethod
+    def is_legal_type(l: list):
+        return all(map(lambda x: x in Utils.LEGAL_TYPE, l))
+
+    @staticmethod
+    def convert_type(series: Series, types: str):
+        if types == 'Categorical':
+            return series.astype(str)
+        elif not Utils.is_numeric(series) and types in ['Ordinal', 'Continues']:
+            return series.astype(float)
+        elif types == 'Datetime':
+            return pd.datetime(series)
+        else:
+            return series
 
     @staticmethod
     def get_describe(series, percentiles=[.25, .5, .75], drop_count=False):
@@ -59,12 +98,26 @@ class Utils:
         :param series: pandas series
         :return: tuple with (num of null, ratio of null)
         """
-        n = series.isnull().sum()
+        n = series.isnull().sum() + (series == 'nan').sum()
         return (n, "{0:.2%}".format(n / series.size)) if re_all else (n, "{0:.2%}".format(n / series.size))[1]
 
     @staticmethod
-    def dtype_infer(series):
+    def dtype_infer(series: Series):
         return pd.api.types.infer_dtype(series)
+
+    @staticmethod
+    def data_type_classifier(series: Series):
+        if Utils.is_categorical(series):
+            return 'Categorical'
+        elif Utils.is_numeric(series):
+            if Utils.is_ordinal(series):
+                return 'Ordinal'
+            else:
+                return 'Continues'
+        elif Utils.is_datetime(series):
+            return 'Datetime'
+        else:
+            return 'Other'
 
     @staticmethod
     def cat_infer(series, n=6):
@@ -136,4 +189,14 @@ class Utils:
             return default
 
         return count
+
+    @staticmethod
+    def flat_dict(x: dict):
+        for key, value in x.items():
+            if isinstance(value, dict):
+                for k, v in Utils.flat_dict(value):
+                    k = f'{key}_{k}'
+                    yield k, v
+            else:
+                yield key, value
 
