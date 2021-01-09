@@ -389,7 +389,7 @@ class VariableAnalysis:
         p_bar = tqdm(self.cols)
 
         for col in p_bar:
-            p_bar.set_description("Plotting var %s" % col)
+            p_bar.set_description("Plotting distribute var %s" % col)
             re[col] = put.plot_distribute(self.X, col=col, dtypes=self._infer_dict[col])
 
         self._distribute = re
@@ -408,7 +408,7 @@ class VariableAnalysis:
         p_bar = tqdm(self.cols)
 
         for col in p_bar:
-            p_bar.set_description("Plotting var %s" % col)
+            p_bar.set_description("Plotting distribute with target var %s" % col)
             re[col] = put.plot_distribute_class(self.data, x=col, target=self._target, dtypes=self._infer_dict[col])
 
         self._distribute_with_target = re

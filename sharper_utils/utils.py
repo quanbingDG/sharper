@@ -169,7 +169,10 @@ class Utils:
     @staticmethod
     def mutual_info_matrix(df_: pd.DataFrame):
         re = pd.DataFrame(index=df_.columns)
-        for i in df_.columns:
+        p_bar = tqdm(df_.columns)
+
+        for i in p_bar:
+            p_bar.set_description("Calc var %s" % i)
             re[i] = [normalized_mutual_info_score(df_[i], df_[j]) for j in df_.columns]
 
         return re
