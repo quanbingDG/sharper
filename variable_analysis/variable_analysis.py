@@ -219,14 +219,6 @@ class VariableAnalysis:
             self._gen_lr_param()
         return self._lr_param
 
-    def _update_cols(self):
-        """
-        modify property cols
-        """
-        _include = self._include if self._include else []
-        _exclude = self._exclude if self._exclude else []
-        self._cols = ut.combin_list(self._data.columns, _include, _exclude)
-
     @property
     def _data_type(self):
         """
@@ -302,14 +294,13 @@ class VariableAnalysis:
             return self.gen_desc()
         return self._desc
 
-    @property
-    def desc_slice(self):
+    def _update_cols(self):
         """
-        :return: Variable description base on slice
+        modify property cols
         """
-        if self._desc_slice is None:
-            return "please call the method slice_desc() first !"
-        return self._desc_slice
+        _include = self._include if self._include else []
+        _exclude = self._exclude if self._exclude else []
+        self._cols = ut.combin_list(self._data.columns, _include, _exclude)
 
     def data_type_update(self, mapping: dict):
         """
@@ -414,53 +405,6 @@ class VariableAnalysis:
         self._distribute_with_target = re
 
         return 'Plotting finished, use command line to show the figure: ".distribute_with_target.get("var").fig" '
-
-    def slice_desc(self, by):
-        """
-        Variable description base on slice
-
-        Parameters
-        ----------
-        :param by: date columns
-        :return:
-        """
-        re = {}
-
-        if self._data[by].dtype.kind != 'M':
-            self._data[by] = pd.to_datetime(self._data[by])
-
-        continues, norminal = ut.split_numeric_norminal(self._data[self._cols])
-
-        df_ = self._data[self._cols].set_index(by).resample('M')
-
-        _tmp = []
-        for col in norminal:
-            _tmp.append(df_[col].apply(ut.get_top_values))
-
-        re['norminal'] = pd.DataFrame(_tmp).T
-        re['continues'] = df_.agg(ut.get_describe)
-
-        self._desc_slice = re
-
-        return self._desc_slice
-
-    def plot_stable(self):
-        """
-        generate the plots which stability of variables
-        """
-        if self._desc_slice is None:
-            return "please call the method slice_desc() first !"
-
-        re = {}
-        # continues
-        for col in self._desc_slice['continues'].columns:
-            for var in self._desc_slice['continues'].index.to_frame()[1].unique():
-                re[col] = {var: self._desc_slice['continues'].loc[(slice(None), var), :][col].
-                    plot(kind='line', marker='o', markerfacecolor='r', markersize=12)}
-
-        self._stable = re
-
-        return self._stable
 
     def _gen_corr_matrix(self):
         """
