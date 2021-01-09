@@ -169,7 +169,6 @@ class Utils:
     @staticmethod
     def mutual_info_matrix(df_: pd.DataFrame):
         re = pd.DataFrame(index=df_.columns)
-
         for i in df_.columns:
             re[i] = [normalized_mutual_info_score(df_[i], df_[j]) for j in df_.columns]
 

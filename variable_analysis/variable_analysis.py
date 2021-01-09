@@ -9,11 +9,13 @@ import pandas as pd
 import numpy as np
 import ipywidgets as wg
 from copy import deepcopy
+from tqdm import tqdm
 from IPython.display import display
 from ipywidgets import Layout
 from ..metrics import Metrics
 from ..sharper_utils import Utils as ut
 from ..sharper_utils import PlotUtils as put
+from ..pandas_support import PandasSupport as ps
 
 
 class VariableAnalysis:
@@ -120,6 +122,8 @@ class VariableAnalysis:
         """
         if self._distribute is None:
             return self.plot_distribute()
+        print('Use command line to show the figure: ".distribute.get("var").figure" ')
+
         return self._distribute
 
     @property
@@ -148,6 +152,8 @@ class VariableAnalysis:
         """
         if self._distribute_with_target is None:
             return self.plot_distribute_with_target()
+        print('Use command line to show the figure: ".distribute_with_target.get("var").fig" ')
+
         return self._distribute_with_target
 
     @property
@@ -268,24 +274,6 @@ class VariableAnalysis:
             self._data_type = modify_cols
             return self._infer_dict
 
-    def data_type_update(self, mapping: dict):
-        """
-        Manually modify the variable type
-
-        Parameters
-        ----------
-        :param mapping: {'var_1': type_1,.., 'var_n': type_n}
-        :return: Modified infer_dict
-        """
-        if ut.is_legal_type(mapping.values()):
-            self._data_type = mapping
-            return "Modify successfully, {0}".format(self._data_type)
-        else:
-            raise ValueError("Only the following types are supported, {0}".format(ut.LEGAL_TYPE))
-
-    def __modify_data(self, data: pd.DataFrame):
-        self._data = data
-
     @property
     def data_type_convert(self):
         """
@@ -297,6 +285,13 @@ class VariableAnalysis:
         self.__modify_data(data)
 
         return "Modify successfully"
+
+    @property
+    def check_balance(self):
+        display(self.y.value_counts().to_frame().pipe(ps.add_ratio, cols=[self._target])
+                .style.bar(color=['lightblue'], align='zero'))
+
+        return put.plot_distribute(self.y.to_frame(), self._target, 'Ordinal').get_figure()
 
     @property
     def desc(self):
@@ -316,13 +311,31 @@ class VariableAnalysis:
             return "please call the method slice_desc() first !"
         return self._desc_slice
 
+    def data_type_update(self, mapping: dict):
+        """
+        Manually modify the variable type
+
+        Parameters
+        ----------
+        :param mapping: {'var_1': type_1,.., 'var_n': type_n}
+        :return: Modified infer_dict
+        """
+        if ut.is_legal_type(mapping.values()):
+            self._data_type = mapping
+            return "Modify successfully, {0}".format(self._data_type)
+        else:
+            raise ValueError("Only the following types are supported, {0}".format(ut.LEGAL_TYPE))
+
+    def __modify_data(self, data: pd.DataFrame):
+        self._data = data
+
     def gen_desc(self, ignore: list = [], percentiles=[.01, .1, .5, .75, .9, .99]):
         """
         Generate variable statistical description
 
         Parameters
         ----------
-        :param na: Set of values not to be counted, default = []
+        :param ignore: Set of values not to be counted, default = []
         :param percentiles: Percentile points to be counted, default = [.01, .1, .5, .75, .9, .99]
         :return:
         """
@@ -363,7 +376,7 @@ class VariableAnalysis:
 
         return self._desc
 
-    def plot_distribute(self, save_path=None):
+    def plot_distribute(self):
         """
         Draw distribution plot based on variable data
 
@@ -373,43 +386,34 @@ class VariableAnalysis:
         :return:
         """
         re = {}
+        p_bar = tqdm(self.cols)
 
-        for col in self._cols:
-            # try:
+        for col in p_bar:
+            p_bar.set_description("Plotting var %s" % col)
             re[col] = put.plot_distribute(self.X, col=col, dtypes=self._infer_dict[col])
-            # except:
-            #     print("the {0} columns plot failed".format(col))
-
-        if save_path:
-            [put.save_fig(re[i], i, 'distribute') for i in re.keys()]
 
         self._distribute = re
 
-        return self._distribute
+        return 'Plotting finished, use command line to show the figure: ".distribute.get("var").figure" '
 
-    def plot_distribute_with_target(self, save_path=None):
+    def plot_distribute_with_target(self):
         """
         Draw distribution plot based on X and y
 
         Parameters
         ----------
-        :param save_path: Path to save fig, if None ignore save
         :return:
         """
         re = {}
+        p_bar = tqdm(self.cols)
 
-        for col in self._cols:
-            if ut.is_numeric(self._data[col]):
-                re[col] = put.plot_distribute_with_target(self._data, col, target=self._target)
-            else:
-                re[col] = put.plot_distribute_with_target_norminal(self._data, col, target=self._target)
-
-        if save_path:
-            [put.save_fig(re[i], i, 'distribute_with_target') for i in re.keys()]
+        for col in p_bar:
+            p_bar.set_description("Plotting var %s" % col)
+            re[col] = put.plot_distribute_class(self.data, x=col, target=self._target, dtypes=self._infer_dict[col])
 
         self._distribute_with_target = re
 
-        return self._distribute_with_target
+        return 'Plotting finished, use command line to show the figure: ".distribute_with_target.get("var").fig" '
 
     def slice_desc(self, by):
         """
