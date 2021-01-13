@@ -413,7 +413,8 @@ class VariableAnalysis:
         self._corr_matrix = {'pearson': self._ori_data.corr(method='pearson'),
                              'kendall': self._ori_data.corr(method='kendall'),
                              'spearman': self._ori_data.corr(method='spearman'),
-                             'mutual_info': ut.mutual_info_matrix(self._ori_data)}
+                             'mutual_info': ut.mutual_info_matrix(self._ori_data)
+                             }
 
         return self._corr_matrix
 
@@ -463,12 +464,12 @@ class VariableAnalysis:
         Single variable lr param and p_value calculation
         """
         from scipy import stats
-        from sklearn.linear_model import LogisticRegressionCV
+        from sklearn.linear_model import LogisticRegression
 
         re = {}
-        lr_cv = LogisticRegressionCV(random_state=9527, max_iter=10000)
-        for col in self._cols:
+        lr_cv = LogisticRegression(random_state=9527, max_iter=10000)
 
+        for col in self._cols:
             X = np.array(self.X[col]).reshape(-1,1)
             y = self.y
             lr_cv.fit(X, y)
@@ -481,7 +482,7 @@ class VariableAnalysis:
             sd_b = np.round(np.sqrt(var_b), 4)
             ts_b = np.round(params / sd_b, 4)
 
-            p_values = np.round([2 * (1 - stats.t.cdf(np.abs(i), (len(newX) - 1))) for i in ts_b], 4)
+            p_values = np.round([2 * (1 - stats.t.cdf(np.abs(i), (len(newX) - 1))) for i in ts_b], 4)[1]
             re[col] = {'coef_':lr_cv.coef_[0][0], 'intercept':lr_cv.intercept_[0], 'p_value':p_values}
 
         self._lr_param = pd.DataFrame.from_dict(re, orient='index')
