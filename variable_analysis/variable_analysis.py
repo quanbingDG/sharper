@@ -28,7 +28,7 @@ class VariableAnalysis:
             5. AR value calculation
             6. Single index logistic regression parameters and P value output
     """
-    def __init__(self, data: pd.DataFrame, target: str) -> None:
+    def __init__(self, data: pd.DataFrame, target: str, fill_value=0) -> None:
         """
             VariableAnalysis init method
 
@@ -51,12 +51,14 @@ class VariableAnalysis:
         self._corr_matrix = None
         self._include = None
         self._exclude = None
-        self._cols = data.columns.drop(target)
+        self._cols = data.columns.drop(target).sort_values()
         self._ks = None
         self._auc = None
         self._ar = None
         self._iv = None
         self._lr_param = None
+        self._fill = fill_value
+        self._bad_rate = data[target].value_counts(normalize=1).loc[1]
 
     @property
     def ori_data(self):
@@ -71,6 +73,14 @@ class VariableAnalysis:
         :return: Dataframe, Target data processed
         """
         return self._data
+
+    @property
+    def fill_value(self):
+        return self._fill
+
+    @fill_value.setter
+    def fill_value(self, value):
+        self._fill = value
 
     @property
     def include(self):
@@ -423,9 +433,9 @@ class VariableAnalysis:
         Single variable ks value calculation
         """
         re = {}
-        for col in self._cols:
-            if ut.is_numeric(self._data[col]) and col != self._target:
-                re[col] = Metrics.ks(self._data[self._target], ut.normalization(self._data[col]))
+        for col in self.cols:
+            if ut.is_numeric(self.X[col]):
+                re[col] = Metrics.ks(self.y, ut.normalization(self.X[col].fillna(self.fill_value)))
         self._ks = pd.DataFrame.from_dict(re, orient='index', columns=['ks'])
         return self._ks
 
@@ -434,9 +444,9 @@ class VariableAnalysis:
         Single variable auc value calculation
         """
         re = {}
-        for col in self._cols:
-            if ut.is_numeric(self._data[col]) and col != self._target:
-                re[col] = Metrics.auc(self._data[self._target], ut.normalization(self._data[col]))
+        for col in self.cols:
+            if ut.is_numeric(self.X[col]):
+                re[col] = Metrics.auc(self.y, ut.normalization(self.X[col].fillna(self.fill_value)))
         self._auc = pd.DataFrame.from_dict(re, orient='index', columns=['auc'])
         return self._auc
 
@@ -445,9 +455,9 @@ class VariableAnalysis:
         Single variable ar value calculation
         """
         re = {}
-        for col in self._cols:
-            if ut.is_numeric(self._data[col]) and col != self._target:
-                re[col] = Metrics.ar(self._data[self._target], ut.normalization(self._data[col]))
+        for col in self.cols:
+            if ut.is_numeric(self.X[col]):
+                re[col] = Metrics.ar(self.y, ut.normalization(self.X[col].fillna(self.fill_value)))
         self._ar = pd.DataFrame.from_dict(re, orient='index', columns=['ar'])
         return self._ar
 
@@ -456,7 +466,7 @@ class VariableAnalysis:
         Single variable iv value calculation
         """
         from toad import quality
-        self._iv = quality(self._data, self._target, iv_only=True)[['iv']]
+        self._iv = quality(self.X, self.y, iv_only=True)[['iv']]
         return self._iv
 
     def _gen_lr_param(self):
@@ -489,3 +499,40 @@ class VariableAnalysis:
 
         return self._lr_param
 
+    def _gen_desc_miss(self):
+        re = {}
+        X = self.X.copy()
+        y = self.y.copy()
+        for col in self.cols:
+            re[col] = y[(X[col].isnull()) | (X[col] == 0)].value_counts(normalize=1).loc[1] * 100
+        re = pd.DataFrame.from_dict(re, orient='index', columns=['miss_bad_rate(%)'])
+        re['normal_bad_rate(%)'] = 100 - re['miss_bad_rate(%)']
+        re['miss_lift'] = re['miss_bad_rate(%)'] / self._bad_rate / 100
+        re['normal_lift'] = re['normal_bad_rate(%)'] / self._bad_rate / 100
+        return re
+
+    def _effect(self):
+        effect = pd.concat([self.univariat_ar, self.univariat_auc, self.univariat_iv, self.univariat_ks,
+                            self.univariat_lr, self._gen_desc_miss()], axis=1)
+        effect['missing'] = self.desc['missing']
+        effect['strategy_able'] = (effect['miss_lift'] >= 3) | (effect['normal_lift'] >= 3)
+        effect['model_able'] = (effect['ar'].apply(lambda x: np.abs(x) > 0.05)) & (effect['missing'] < 0.7) & \
+                               (effect['iv'].apply(lambda x: x > 0.02))
+
+        return effect
+
+    def logstic_model(self):
+        pass
+
+    def save_report(self, ignore=[0]):
+        try:
+            writer = pd.ExcelWriter()
+            self.desc.to_excel(writer, sheet_name='描述性统计')
+            self.gen_desc(ignore=ignore).to_excel(writer, sheet_name='描述性统计(去除{}值)'.format(ignore))
+            self._effect().to_excel(writer, sheet_name='效果分析')
+            self.corr_matrix['pearson'].to_excel(writer, sheet_name='Pearson相关矩阵')
+            writer.save()
+        except:
+            raise SystemError('save failed')
+        finally:
+            writer.close()
