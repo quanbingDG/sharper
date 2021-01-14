@@ -521,8 +521,18 @@ class VariableAnalysis:
 
         return effect
 
-    def logstic_model(self):
-        pass
+    def stepwise_regression(self):
+        from toad import selection
+        from sklearn.linear_model import LogisticRegressionCV
+        data_filter = selection.stepwise(self.data[list(self.cols) + [self._target]], target=self._target,
+                                         estimator='ols', direction='both', criterion='aic')
+        X = data_filter.drop(self._target, axis=1).fillna(self.fill_value)
+        y = self.y
+        lr_cv = LogisticRegressionCV(random_state=9527, max_iter=10000000)
+        lr_cv.fit(X, y)
+        data_filter['auc'] = Metrics.auc(y, lr_cv.predict(X))
+        data_filter['ks'] = Metrics.ks(y, lr_cv.predict(X))
+        return data_filter
 
     def save_report(self, ignore=[0]):
         try:
@@ -531,6 +541,7 @@ class VariableAnalysis:
             self.gen_desc(ignore=ignore).to_excel(writer, sheet_name='描述性统计(去除{}值)'.format(ignore))
             self._effect().to_excel(writer, sheet_name='效果分析')
             self.corr_matrix['pearson'].to_excel(writer, sheet_name='Pearson相关矩阵')
+            self.stepwise_regression().to_excel(writer, sheet_name='逐步回归结果')
             writer.save()
         except:
             raise SystemError('save failed')
