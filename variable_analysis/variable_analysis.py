@@ -59,6 +59,7 @@ class VariableAnalysis:
         self._lr_param = None
         self._fill = fill_value
         self._bad_rate = data[target].value_counts(normalize=1).loc[1]
+        self._effect = None
 
     @property
     def ori_data(self):
@@ -422,8 +423,8 @@ class VariableAnalysis:
         """
         self._corr_matrix = {'pearson': self._ori_data.corr(method='pearson'),
                              'kendall': self._ori_data.corr(method='kendall'),
-                             'spearman': self._ori_data.corr(method='spearman'),
-                             'mutual_info': ut.mutual_info_matrix(self._ori_data)
+                             'spearman': self._ori_data.corr(method='spearman')
+                             # 'mutual_info': ut.mutual_info_matrix(self._ori_data)
                              }
 
         return self._corr_matrix
@@ -504,27 +505,36 @@ class VariableAnalysis:
         X = self.X.copy()
         y = self.y.copy()
         for col in self.cols:
-            re[col] = y[(X[col].isnull()) | (X[col] == 0)].value_counts(normalize=1).loc[1] * 100
+            try:
+                re[col] = y[(X[col].isnull()) | (X[col] == 0)].value_counts(normalize=1).loc[1] * 100
+            except KeyError:
+                re[col] = 0
         re = pd.DataFrame.from_dict(re, orient='index', columns=['miss_bad_rate(%)'])
         re['normal_bad_rate(%)'] = 100 - re['miss_bad_rate(%)']
         re['miss_lift'] = re['miss_bad_rate(%)'] / self._bad_rate / 100
         re['normal_lift'] = re['normal_bad_rate(%)'] / self._bad_rate / 100
         return re
 
-    def _effect(self):
-        effect = pd.concat([self.univariat_ar, self.univariat_auc, self.univariat_iv, self.univariat_ks,
-                            self.univariat_lr, self._gen_desc_miss()], axis=1)
-        effect['missing'] = self.desc['missing']
-        effect['strategy_able'] = (effect['miss_lift'] >= 3) | (effect['normal_lift'] >= 3)
-        effect['model_able'] = (effect['ar'].apply(lambda x: np.abs(x) > 0.05)) & (effect['missing'] < 0.7) & \
-                               (effect['iv'].apply(lambda x: x > 0.02))
+    def effect(self):
+        if self._effect is None:
+            effect = pd.concat([self.univariat_ar, self.univariat_auc, self.univariat_iv, self.univariat_ks,
+                                self.univariat_lr, self._gen_desc_miss()], axis=1)
+            effect['missing'] = self.desc['missing']
+            effect['strategy_able'] = (effect['miss_lift'] >= 3) | (effect['normal_lift'] >= 3)
+            effect['model_able'] = (effect['ar'].apply(lambda x: np.abs(x) > 0.05)) & \
+                                   (effect['missing'].apply(lambda x: float(str(x).replace('%', ''))) < 0.7) \
+                                   & (effect['iv'].apply(lambda x: x > 0.02))
+            self._effect = effect
 
-        return effect
+        return self._effect
 
-    def stepwise_regression(self):
+    def stepwise_regression(self, is_model_able=True):
         from toad import selection
         from sklearn.linear_model import LogisticRegressionCV
-        data_filter = selection.stepwise(self.data[list(self.cols) + [self._target]], target=self._target,
+        in_cols = self.cols
+        if is_model_able:
+            in_cols = self.effect()[self.effect()['model_able'] is True].index.to_list()
+        data_filter = selection.stepwise(self.data[in_cols + [self._target]], target=self._target,
                                          estimator='ols', direction='both', criterion='aic')
         X = data_filter.drop(self._target, axis=1).fillna(self.fill_value)
         y = self.y
@@ -535,15 +545,11 @@ class VariableAnalysis:
         return data_filter
 
     def save_report(self, ignore=[0]):
-        try:
-            writer = pd.ExcelWriter()
-            self.desc.to_excel(writer, sheet_name='描述性统计')
-            self.gen_desc(ignore=ignore).to_excel(writer, sheet_name='描述性统计(去除{}值)'.format(ignore))
-            self._effect().to_excel(writer, sheet_name='效果分析')
-            self.corr_matrix['pearson'].to_excel(writer, sheet_name='Pearson相关矩阵')
-            self.stepwise_regression().to_excel(writer, sheet_name='逐步回归结果')
-            writer.save()
-        except:
-            raise SystemError('save failed')
-        finally:
-            writer.close()
+        import time
+        with pd.ExcelWriter('effect_{0}.xlsx'.format(time.time_ns())) as writer:
+            self.desc.apply(ut.infer_float_round).to_excel(writer, sheet_name='描述性统计')
+            self.gen_desc(ignore=ignore).apply(ut.infer_float_round).to_excel(writer, sheet_name='描述性统计(去除ignore值)')
+            self.effect().apply(ut.infer_float_round).to_excel(writer, sheet_name='效果分析')
+            self.corr_matrix['pearson'].apply(ut.infer_float_round).to_excel(writer, sheet_name='Pearson相关矩阵')
+            self.stepwise_regression().apply(ut.infer_float_round).to_excel(writer, sheet_name='逐步回归结果')
+            ps.pandas_excel_style(writer).save()
