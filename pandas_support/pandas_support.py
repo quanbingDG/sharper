@@ -76,6 +76,14 @@ class PandasSupport:
         df_.loc['sum'] = sum_list
         return df_
 
+    @staticmethod
+    def pandas_excel_style(writer: pd.ExcelWriter, font_name='SimHei'):
+        fmt = writer.book.add_format({"font_name": font_name})
+        for name, sheet in writer.sheets.items():
+            sheet.set_column('A:Z', None, fmt)
+            sheet.set_row(0, None, fmt)
+        return writer
+
 
 if __name__ == '__main__':
     PS = PandasSupport()
