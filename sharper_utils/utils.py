@@ -172,7 +172,7 @@ class Utils:
         p_bar = tqdm(df_.columns)
 
         for i in p_bar:
-            p_bar.set_description("Calc var %s" % i)
+            p_bar.set_description("Calc mutual_info, var %s" % i)
             re[i] = [normalized_mutual_info_score(df_[i], df_[j]) for j in df_.columns]
 
         return re
@@ -202,3 +202,8 @@ class Utils:
             else:
                 yield key, value
 
+    @staticmethod
+    def infer_float_round(series: Series, num=2):
+        if series.dtype.kind == 'f':
+            return series.apply(lambda x: round(x, num))
+        return series
