@@ -218,3 +218,10 @@ class Utils:
             return re
         else:
             return re.get(label, np.nan)
+
+    @staticmethod
+    def rank_by_index_num(x: list, reverse=False):
+        import re
+        x.sort(key=lambda y: int(re.sub(r'\D', '', y)), reverse=reverse)
+        return x
+
