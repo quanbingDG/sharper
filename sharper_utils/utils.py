@@ -181,6 +181,9 @@ class Utils:
     def normalization(series: pd.Series):
         _max = series.max()
         _min = series.min()
+        # fixed division by zero bug
+        if _max == _min == 0:
+            return series
         return pd.Series([(i-_min) / (_max - _min) for i in series])
 
     @staticmethod
