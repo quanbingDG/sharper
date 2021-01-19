@@ -505,12 +505,13 @@ class VariableAnalysis:
         X = self.X.copy()
         y = self.y.copy()
         for col in self.cols:
-            try:
-                re[col] = y[(X[col].isnull()) | (X[col] == 0)].value_counts(normalize=1).loc[1] * 100
-            except KeyError:
-                re[col] = 0
-        re = pd.DataFrame.from_dict(re, orient='index', columns=['miss_bad_rate(%)'])
-        re['normal_bad_rate(%)'] = 100 - re['miss_bad_rate(%)']
+            re[col] = []
+            _miss = y[(X[col].isnull()) | (X[col] == 0)]
+            _normal = y[-((X[col].isnull()) | (X[col] == 0))]
+            re[col].append(ut.bad_ratio(_miss, label=1))
+            re[col].append(ut.bad_ratio(_normal, label=1))
+
+        re = pd.DataFrame.from_dict(re, orient='index', columns=['miss_bad_rate(%)', 'normal_bad_rate(%)'])
         re['miss_lift'] = re['miss_bad_rate(%)'] / self._bad_rate / 100
         re['normal_lift'] = re['normal_bad_rate(%)'] / self._bad_rate / 100
         return re
@@ -533,7 +534,7 @@ class VariableAnalysis:
         from sklearn.linear_model import LogisticRegressionCV
         in_cols = self.cols
         if is_model_able:
-            in_cols = self.effect()[self.effect()['model_able'] is True].index.to_list()
+            in_cols = self.effect()[self.effect()['model_able']].index.to_list()
         data_filter = selection.stepwise(self.data[in_cols + [self._target]], target=self._target,
                                          estimator='ols', direction='both', criterion='aic')
         X = data_filter.drop(self._target, axis=1).fillna(self.fill_value)
@@ -550,6 +551,6 @@ class VariableAnalysis:
             self.desc.apply(ut.infer_float_round).to_excel(writer, sheet_name='描述性统计')
             self.gen_desc(ignore=ignore).apply(ut.infer_float_round).to_excel(writer, sheet_name='描述性统计(去除ignore值)')
             self.effect().apply(ut.infer_float_round).to_excel(writer, sheet_name='效果分析')
-            self.corr_matrix['pearson'].apply(ut.infer_float_round).to_excel(writer, sheet_name='Pearson相关矩阵')
+            self.corr_matrix['pearson'].apply(ut.infer_float_round, args=4).to_excel(writer, sheet_name='Pearson相关矩阵')
             self.stepwise_regression().apply(ut.infer_float_round).to_excel(writer, sheet_name='逐步回归结果')
             ps.pandas_excel_style(writer).save()
