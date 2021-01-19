@@ -207,3 +207,11 @@ class Utils:
         if series.dtype.kind == 'f':
             return series.apply(lambda x: round(x, num))
         return series
+
+    @staticmethod
+    def bad_ratio(series: Series, label=None):
+        re = series.value_counts(normalize=True).to_dict()
+        if label is None:
+            return re
+        else:
+            return re.get(label, np.nan)
