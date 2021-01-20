@@ -41,7 +41,7 @@ class VariableAnalysis:
 
         self._ori_data = data
         self._target = target
-        self._data = data.copy()
+        self._data = data.replace([np.inf, -np.inf], np.nan).copy()
         self._infer_dict = data.dtypes.to_dict()
         self._desc = None
         self._desc_slice = None
@@ -51,7 +51,7 @@ class VariableAnalysis:
         self._corr_matrix = None
         self._include = None
         self._exclude = None
-        self._cols = data.columns.drop(target).sort_values()
+        self._cols = ut.rank_by_index_num(data.columns.drop(target).to_list())
         self._ks = None
         self._auc = None
         self._ar = None
@@ -518,8 +518,10 @@ class VariableAnalysis:
 
     def effect(self):
         if self._effect is None:
-            effect = pd.concat([self.univariat_ar, self.univariat_auc, self.univariat_iv, self.univariat_ks,
+            effect = pd.concat([self.univariat_ar, self.univariat_auc, self.univariat_ks,
                                 self.univariat_lr, self._gen_desc_miss()], axis=1)
+            # 由于iv值由toad计算，改变了index顺序，需要fix it
+            effect['iv'] = [self.univariat_iv.loc[i]['iv'] for i in self.cols]
             effect['missing'] = self.desc['missing']
             effect['strategy_able'] = (effect['miss_lift'] >= 3) | (effect['normal_lift'] >= 3)
             effect['model_able'] = (effect['ar'].apply(lambda x: np.abs(x) > 0.05)) & \
@@ -551,6 +553,6 @@ class VariableAnalysis:
             self.desc.apply(ut.infer_float_round).to_excel(writer, sheet_name='描述性统计')
             self.gen_desc(ignore=ignore).apply(ut.infer_float_round).to_excel(writer, sheet_name='描述性统计(去除ignore值)')
             self.effect().apply(ut.infer_float_round).to_excel(writer, sheet_name='效果分析')
-            self.corr_matrix['pearson'].apply(ut.infer_float_round, args=4).to_excel(writer, sheet_name='Pearson相关矩阵')
+            self.corr_matrix['pearson'].apply(ut.infer_float_round, num=4).to_excel(writer, sheet_name='Pearson相关矩阵')
             self.stepwise_regression().apply(ut.infer_float_round).to_excel(writer, sheet_name='逐步回归结果')
             ps.pandas_excel_style(writer).save()
