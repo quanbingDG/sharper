@@ -266,4 +266,19 @@ class Metrics:
         def plot_lift(score, target, bucket, figsize: tuple = (10, 8)):
             ks_bucket = Metrics.ks_bucket(score=score, target=target, bucket=bucket)
             fig = plt.figure(figsize=figsize)
-            plt.plot
+            plt.plot('max', 'cum_lift', data=ks_bucket, marker='o', label='lift_value')
+            plt.ylim(0, 2)
+            fig = pt.add_annotate(fig, format='.2f')
+            plt.title("LIFT = Cum BadRate/Cum TotalRate")
+            plt.legend(loc=4)
+            plt.grid()
+
+        @staticmethod
+        def plot_gain(score, target, bucket, figsize: tuple = (10, 8)):
+            ks_bucket = Metrics.ks_bucket(score=score, target=target, bucket=bucket)
+            fig = plt.figure(figsize=figsize)
+            plt.plot('max', 'cum_total_prop', data=ks_bucket, marker='o', label='gain_value')
+            fig = pt.add_annotate(fig, format='.2f')
+            plt.title("GAIN = Cum BadRate")
+            plt.legend(loc=4)
+            plt.grid()
