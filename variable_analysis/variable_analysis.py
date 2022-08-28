@@ -42,16 +42,22 @@ class VariableAnalysis:
         self._ori_data = data
         self._target = target
         self._data = data.copy()
-        self._infer_dict = data.dtypes.to_dict()
+        self._dtypes_dict = data.dtypes.to_dict()
+        self._infer_dict = None
         self._desc = None
         self._desc_slice = None
         self._distribute = None
         self._distribute_with_target = None
+        self._distribute_group_target = None
+        self._distribute_badrate = None
         self._stable = None
         self._corr_matrix = None
         self._include = None
         self._exclude = None
         self._cols = data.columns.drop(target)
+        self._fill_continuous = -9999
+        self._fill_nominal = 'X'
+        self._plot_bins = None
         self._ks = None
         self._auc = None
         self._ar = None
@@ -66,11 +72,74 @@ class VariableAnalysis:
         return self._ori_data
 
     @property
+    def fill_na(self):
+        """
+        """
+        if self._infer_dict is None:
+            print(" please use the 'data_type_infer' property to conform datatype")
+            return self._infer_dict
+        else:
+            for ind, ind_type in self._infer_dict.items():
+                if ind_type == "Categorical":
+                    self._data[ind].replace({-9999: 'X', np.nan: 'X', 'Null': 'X'}, inplace=True)
+                elif ind_type == 'Ordinal':
+                    self._data[ind].replace({-9999: 'X', np.nan: 'X'}, inplace=True)
+                elif ind_type == 'Continues':
+                    self._data[ind].replace({np.nan: -9999}, inplace=True)
+            print("fill finished")
+
+    @property
     def data(self):
         """
         :return: Dataframe, Target data processed
         """
         return self._data
+
+    @property
+    def plot_bins(self):
+        """
+        """
+        if self._plot_bins is None:
+            print("you should set the first, like plot_bins = dict(xx)")
+        return self._plot_bins
+
+    @plot_bins.setter
+    def plot_bins(self, value):
+        """
+        """
+        if not isinstance(value, dict):
+            raise TypeError("up")
+        self._plot_bins = value
+
+    @property
+    def fill_nominal(self):
+        """
+        """
+        return self._fill_nominal
+
+    @fill_nominal.setter
+    def fill_nominal(self, value):
+        """
+        """
+        if not isinstance(value, str):
+            raise TypeError("up")
+        self._fill_nominal = value
+        return f"modify finished, fill_nominal value is {self._fill_nominal} now"
+
+    @property
+    def fill_continuous(self):
+        """
+        """
+        return self._fill_continuous
+
+    @fill_continuous.setter
+    def fill_nominal(self, value):
+        """
+        """
+        if not isinstance(value, str):
+            raise TypeError("up")
+        self._fill_continuous = value
+        return f"modify finished, fill_continuous value is {self._fill_continuous} now"
 
     @property
     def include(self):
@@ -157,13 +226,46 @@ class VariableAnalysis:
         return self._distribute_with_target
 
     @property
+    def distribute_group_target(self):
+        """
+        Calculate correlation matrix based on X and y with grouped data
+
+        Parameters
+        ----------
+        :return: Distribution 2d with (var, y)
+        """
+        if self._distribute_group_target is None:
+            return self.plot_distribute_group_target()
+        print('Use command line to show the figure: ".distribute_group_target.get("var").fig" ')
+
+    @property
+    def distribute_badrate(self):
+        """
+        Calculate correlation matrix based on X and y with grouped data
+
+        Parameters
+        ----------
+        :return: Distribution 2d with (var, y)
+        """
+        if self.plot_bins is None:
+            raise TypeError("you should set this first, like plot_bins = dict(xx)")
+
+        if self._distribute_badrate is None:
+            return self.plot_distribute()
+        print('Use command line to show the figure: ".distribute_badrate.get("var").fig" ')
+
+        return self._distribute_badrate
+
+    @property
     def stable(self):
         """
         generate the plots which stability of variables
         :return: {'var':subplot}
         """
         if self._stable is None:
-            return self.plot_stable()
+            return f"please call the fuction .plot_stable() firsr!"
+        print('Use command line to show the figure: ".stable.get("var").fig" ')
+
         return self._stable
 
     @property
@@ -224,12 +326,14 @@ class VariableAnalysis:
         """
         :return: Type of data
         """
+        if self._infer_dict is None:
+            print("please use the 'data_type_infer' property to conform datatype")
         return self._infer_dict
 
     @_data_type.setter
     def _data_type(self, value: dict):
         if isinstance(value, dict):
-            self._infer_dict.update(value)
+            self._infer_dict = value
         else:
             raise TypeError("please input the value like {'col1': int, 'col2': float}")
 
@@ -244,7 +348,7 @@ class VariableAnalysis:
         :return: infer data type
         """
         modify_cols = {}
-        infer_dtype = deepcopy(self._infer_dict)
+        infer_dtype = deepcopy(self._dtypes_dict)
 
         if infer_flag:
             for col in self._data.columns:
@@ -367,6 +471,36 @@ class VariableAnalysis:
 
         return self._desc
 
+    def plot_stable(self, by=None, resample=None):
+        """
+        """
+        if self._infer_dict is None:
+            raise TypeError("need to call method 'data_type_infer' first")
+        if by is None or resample is None:
+            raise TypeError("columns by/resample must give")
+
+        re = {}
+        p_bar = tqdm(self.cols)
+        for col in p_bar:
+            p_bar.set_description(f"Plotting distribute var {col}")
+            re[col] = put.plot_var_stable(self._ori_data, col=col, dtypes=self._infer_dict[col], by=by, resample=resample)
+
+        self._stable = re
+
+        return 'Plotting finished, use command line to show the figure: ".distribute.get("var").figure"'
+
+    def plot_stable_by_x(self, x=None, by=None, resample=None, bins=None):
+        """
+        """
+        if self._infer_dict is None:
+            raise TypeError("need to call method 'data_type_infer' first")
+        if by is None or resample is None:
+            raise TypeError("columns by/resample must give")
+
+        if x not in self._cols:
+            raise TypeError("x should in the cols")
+        return put.plot_var_stable(self._ori_data, col=x, dtypes=self._infer_dict[x], by=by, resample=resample, usr_bins=bins)
+
     def plot_distribute(self):
         """
         Draw distribution plot based on variable data
@@ -376,6 +510,9 @@ class VariableAnalysis:
         :param save_path: Path to save fig, if None ignore save
         :return:
         """
+        if self._infer_dict is None:
+            raise TypeError("need to call method 'data_type_infer' first")
+
         re = {}
         p_bar = tqdm(self.cols)
 
@@ -395,6 +532,9 @@ class VariableAnalysis:
         ----------
         :return:
         """
+        if self._infer_dict is None:
+            raise TypeError("need to call method 'data_type_infer' first")
+
         re = {}
         p_bar = tqdm(self.cols)
 
@@ -405,6 +545,60 @@ class VariableAnalysis:
         self._distribute_with_target = re
 
         return 'Plotting finished, use command line to show the figure: ".distribute_with_target.get("var").fig" '
+
+    def plot_distribute_group_target(self):
+        """
+        Draw distribution plot based on X and y
+
+        Parameters
+        ----------
+        :return:
+        """
+        if self._infer_dict is None:
+            raise TypeError("need to call method 'data_type_infer' first")
+
+        re = {}
+        p_bar = tqdm(self.cols)
+
+        for col in p_bar:
+            p_bar.set_description("Plotting distribute with target var %s" % col)
+            re[col] = put.plot_distribute_group(self.data, x=col, target=self._target, dtypes=self._infer_dict[col])
+
+        self._distribute_group_target = re
+
+        return 'Plotting finished, use command line to show the figure: ".distribute_group.get("var").fig" '
+
+    def plot_distribute_badrate(self, x=None, usr_bins=None):
+        """
+        Draw distribution plot based on X and y
+
+        Parameters
+        ----------
+        :return:
+        """
+        if self._infer_dict is None:
+            raise TypeError("need to call method 'data_type_infer' first")
+
+        if x is not None and usr_bins is not None:
+            if self._data_type.get(x) not in ['Categorical', 'Ordinal']:
+                return put.plot_default_con(self.data, x=x, target=self._target,
+                                            bins=usr_bins)
+            else:
+                return put.plot_default_cat(self.data, x=x, target=self._target)
+
+        re = {}
+        p_bar = tqdm(self.cols)
+
+        for col in p_bar:
+            p_bar.set_description("Plotting distribute with target var %s" % col)
+            if self._plot_bins[col]['var_type'] == 'Continuous' and self._data_type.get(col) not in ['Categorical', 'Ordinal']:
+                re[col] = put.plot_default_con(self.data, x=col, target=self._target, bins=self._plot_bins[col].get('bins'))
+            else:
+                re[col] = put.plot_default_cat(self.data, x=col, target=self._target)
+
+        self._distribute_badrate = re
+
+        return 'Plotting finished, use command line to show the figure: "distribute_badrate.get("var").fig" '
 
     def _gen_corr_matrix(self):
         """

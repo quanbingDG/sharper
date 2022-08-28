@@ -31,7 +31,7 @@ class Utils:
         :param series:
         :return:
         """
-        if pd.Series(sorted(series.dropna().unique())).diff().dropna().nunique() == 1:
+        if pd.Series(sorted(series.dropna().unique())).diff().dropna().nunique() == 1 and series.dropna().nunique() <= 8:
             return True
         else:
             return False
@@ -110,7 +110,7 @@ class Utils:
         if Utils.is_categorical(series):
             return 'Categorical'
         elif Utils.is_numeric(series):
-            if Utils.is_ordinal(series):
+            if Utils.is_ordinal(series) is True:
                 return 'Ordinal'
             else:
                 return 'Continues'
@@ -181,6 +181,8 @@ class Utils:
     def normalization(series: pd.Series):
         _max = series.max()
         _min = series.min()
+        if _max == _min:
+            _max += 1e-06
         return pd.Series([(i-_min) / (_max - _min) for i in series])
 
     @staticmethod
@@ -201,4 +203,42 @@ class Utils:
                     yield k, v
             else:
                 yield key, value
+
+    @staticmethod
+    def col_filter(cols=None, kw=None, ftype=None, exclude=None):
+        """
+        dataframe 过滤列函数
+        """
+        if ftype is None:
+            re = list(filter(lambda x: kw in x, cols))
+        elif ftype == 's':
+            re = list(filter(lambda x: str(x).startswith(kw), cols))
+        elif ftype == 'e':
+            re = list(filter(lambda x: str(x).endswith(kw), cols))
+        if exclude is not None:
+            re = [i for i in re if exclude not in i]
+        return re
+
+    @staticmethod
+    def  fillna(feature, by=-1):
+        # copy array
+        copied = np.copy(feature)
+
+        mask = pd.isna(copied)
+
+        copied[mask] = by
+
+        return copied
+
+    @staticmethod
+    def bin_by_splits(feature, splits):
+        """Bin feature by split points
+        """
+        feature = Utils.fillna(feature)
+
+        if not isinstance(splits, (list, np.ndarray)):
+            splits = [splits]
+
+        return np.digitize(feature, splits)
+
 

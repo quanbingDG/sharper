@@ -114,7 +114,7 @@ class PlotUtils:
         if dtypes in ['Categorical', 'Ordinal']:
             return PlotUtils.plot_distribute_cat(data=data, x=x, col=target, **kwargs)
         elif dtypes == 'Continues':
-            return PlotUtils.plot_distribute_dis(data, x=x, col=target, **kwargs)
+            return PlotUtils.plot_distribute_dis(data=data, x=x, col=target, **kwargs)
         return 'Unsupported data type'
 
     @staticmethod
