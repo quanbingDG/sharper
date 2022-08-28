@@ -36,7 +36,7 @@ class PlotUtils:
         """
         """
         for rect in ax.patches:
-            y_value = rect.patches()
+            y_value = rect.get_height()
             x_value = rect.get_x() + rect.get_width() / 2
 
             PlotUtils.annotate(ax, x_value, y_value, **kwargs)
@@ -76,9 +76,9 @@ class PlotUtils:
         elif loc == 'top right':
             loc = (x_max - x_offset, y_max - y_offset)
         elif loc == 'bottom left':
-            loc = (x_min + x_offset, y_max + y_offset)
+            loc = (x_min + x_offset, y_min + y_offset)
         elif loc == 'bottom right':
-            loc = (x_max - x_offset, y_max + y_offset)
+            loc = (x_max - x_offset, y_min + y_offset)
 
         ax.text(*loc, text, fontsize='x-large')
 
@@ -185,7 +185,7 @@ class PlotUtils:
         fig, ax_arr = plt.subplots(1, len(target_unique), figsize=(16, 8))
         for n, i in enumerate(target_unique):
             ax_arr[n].set_title('when {0} = {1}'.format(target, i))
-            sns.hisplot(data=grouped.get_group(i), x=x, stat='count', bins=10, ax=ax_arr[n])
+            sns.histplot(data=grouped.get_group(i), x=x, stat='count', bins=10, ax=ax_arr[n])
             ax_arr[n] = PlotUtils.add_annotate(ax_arr[n], format='.0f')
 
         plt.close('all')
@@ -298,7 +298,7 @@ class PlotUtils:
         return fig
 
     @staticmethod
-    def plot_var_stable(data:pd.DataFrame, col, dtypes, by=None, resample='3M', figsize=(20, 8), usr_bins=None):
+    def plot_var_stable(data: pd.DataFrame, col, dtypes, by=None, resample='3M', figsize=(20, 8), usr_bins=None):
         """
         """
         fig = plt.figure(figsize=figsize)
@@ -308,7 +308,7 @@ class PlotUtils:
         plt.title("Var:{0} stable distribute".format(col))
         if not isinstance(data[by], np.datetime64):
             try:
-                data[by] = pd.to_datetime((data[by]))
+                data[by] = pd.to_datetime(data[by])
             except:
                 raise TypeError("the columns by must be datetime")
         _tmp = data.set_index(by).resample(resample)

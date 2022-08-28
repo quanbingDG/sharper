@@ -220,7 +220,7 @@ class Utils:
         return re
 
     @staticmethod
-    def  fillna(feature, by=-1):
+    def fillna(feature, by=-1):
         # copy array
         copied = np.copy(feature)
 

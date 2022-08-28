@@ -133,13 +133,13 @@ class VariableAnalysis:
         return self._fill_continuous
 
     @fill_continuous.setter
-    def fill_nominal(self, value):
+    def fill_continuous(self, value):
         """
         """
         if not isinstance(value, str):
             raise TypeError("up")
         self._fill_continuous = value
-        return f"modify finished, fill_continuous value is {self._fill_continuous} now"
+        print(f"modify finished, fill_continuous value is {self._fill_continuous} now")
 
     @property
     def include(self):
@@ -238,6 +238,8 @@ class VariableAnalysis:
             return self.plot_distribute_group_target()
         print('Use command line to show the figure: ".distribute_group_target.get("var").fig" ')
 
+        return self._distribute_group_target
+
     @property
     def distribute_badrate(self):
         """
@@ -251,7 +253,7 @@ class VariableAnalysis:
             raise TypeError("you should set this first, like plot_bins = dict(xx)")
 
         if self._distribute_badrate is None:
-            return self.plot_distribute()
+            return self.plot_distribute_badrate()
         print('Use command line to show the figure: ".distribute_badrate.get("var").fig" ')
 
         return self._distribute_badrate
@@ -587,7 +589,7 @@ class VariableAnalysis:
                 return put.plot_default_cat(self.data, x=x, target=self._target)
 
         re = {}
-        p_bar = tqdm(self.cols)
+        p_bar = tqdm(self._plot_bins.keys())
 
         for col in p_bar:
             p_bar.set_description("Plotting distribute with target var %s" % col)
@@ -649,7 +651,7 @@ class VariableAnalysis:
         Single variable iv value calculation
         """
         from toad import quality
-        self._iv = quality(self._data, self._target, iv_only=True)[['iv']]
+        self._iv = quality(self._data[self._cols], self._target, iv_only=False)[['iv', 'gini', 'entropy', 'unique']]
         return self._iv
 
     def _gen_lr_param(self):

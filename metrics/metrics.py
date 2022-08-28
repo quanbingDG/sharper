@@ -44,9 +44,9 @@ class Metrics:
         elif isinstance(bucket, (list, np.ndarray, pd.Series)):
             # list of split pointers
             if len(bucket) < len(score):
-                bucket = ut.bin_by_splitss(score, bucket)
+                bucket = ut.bin_by_splits(score, bucket)
 
-                df['bucket'] = bucket
+            df['bucket'] = bucket
         elif isinstance(bucket, int):
             def _merge(feature, n_bins=10, _return_splits=False):
                 _splits = pd.qcut(feature, q=n_bins, retbins=True)[1][1:-1]
@@ -72,7 +72,7 @@ class Metrics:
         agg2 = (agg1.sort_values(by='min')).reset_index(drop=True)
 
         agg2['bad_rate'] = agg2['bads'] / agg2['total']
-        agg2['good_rate'] = agg2['goods'] / agg2['tatal']
+        agg2['good_rate'] = agg2['goods'] / agg2['total']
 
         agg2['odds'] = agg2['bads'] / agg2['goods']
 
@@ -189,7 +189,7 @@ class Metrics:
 
     @staticmethod
     def plot_roc(data: pd.DataFrame, x: str, target: str, figsize: tuple = (10, 8), annotate_format=".2f",
-                 is_positive_corr=None, compare=None, compare_is_positive_corr=None):
+                 is_positive_corr=True, compare=None, compare_is_positive_corr=None):
         """
         """
         auc, fpr, tpr, threshold = Metrics.auc(data[target], data[x], return_curve=True,
@@ -197,7 +197,7 @@ class Metrics:
         fig = plt.figure(figsize=figsize)
         ax1 = fig.add_subplot(111, )
         ax1.plot(fpr, tpr, label='roc curve', color='r')
-        pt.add_text(ax1, 'AUC： {:.4f}'.format(auc))
+        pt.add_text(ax1, 'AUC: {:.4f}'.format(auc))
         ax1.set_xlabel('FPR')
         ax1.set_ylabel('TPR')
         ax1.grid(False)
@@ -237,13 +237,13 @@ class Metrics:
 
             # 绘制最优曲线
             best_point = [bad_label_size / sample_size, 1]
-            plt.plot([0, best_point[0], 1], [best_point[1], 1], color="red", label="最优曲线", zorder=10)
+            plt.plot([0, best_point[0], 1], [0, best_point[1], 1], color="red", label="最优曲线", zorder=10)
             # 增加最优情况的点的坐标
             plt.scatter(best_point[0], 1, color="white", edgecolors="red", s=30, zorder=30)
-            plt.text(best_point[0] + 0.1, 0.95, "{}/{},{}".format(bad_label_size, sample_size, 1), ha="cenrer")
+            plt.text(best_point[0] + 0.1, 0.95, "{}/{},{}".format(bad_label_size, sample_size, 1), ha="center", va="center")
 
             # 随机曲线
-            plt.plot([0, 1], [0, 1], color="gray", iinestyle="--", label="随机曲线")
+            plt.plot([0, 1], [0, 1], color="gray", linestyle="--", label="随机曲线")
 
             # 颜色填充
             plt.fill_between(x_list, y_list, x_list, color="blue", alpha=0.3)
@@ -254,7 +254,7 @@ class Metrics:
             # 计算AR值
             # 实际曲线下面积
             actual_area = np.trapz(y_list, x_list) - 1 * 1 / 2
-            best_area = 1 * 1 / 2 - 1 * bad_label_size / sample_size /2
+            best_area = 1 * 1 / 2 - 1 * bad_label_size / sample_size / 2
             ar_value = actual_area / best_area
             plt.title("CAP曲线 AR={:.3f}".format(ar_value))
 
